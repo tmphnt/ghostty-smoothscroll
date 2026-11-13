@@ -9,7 +9,7 @@
 
 import AppKit
 
-let version = "0.1.3"
+let version = "0.1.4"
 let agentLabel = "io.github.ghostty-smoothscroll"
 var settings = Settings.load()
 
@@ -402,6 +402,11 @@ do {
     case "config": try config()
     case "permissions": openPermissionPane(); print("opened \(permissionPane)")
     case "_key": testKey(Array(CommandLine.arguments.dropFirst(2)))
+    case "_badge":   // test: show the badge over a 800×500 window at (100, 100) for 3 s
+        NSApplication.shared.setActivationPolicy(.accessory)
+        let badge = Badge()
+        badge.show(over: CGRect(x: 100, y: 100, width: 800, height: 500))
+        RunLoop.main.run(until: Date().addingTimeInterval(3))
     case "version", "--version": print(version)
     default:
         print("""

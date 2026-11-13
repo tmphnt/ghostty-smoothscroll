@@ -9,7 +9,8 @@
 //                                typing anything else leaves it and types.
 //   hold j / k                   scroll one line per frame until released
 //   d / u                        one page down / up, eased
-// While it's on, ⇅ shows in the menu bar.
+// While it's on, ⇅ shows in the menu bar, and in a plain shell a SCROLL badge
+// shows in the window's bottom-right corner.
 
 import AppKit
 
@@ -20,6 +21,8 @@ final class Daemon {
     private var tap: CFMachPort?
     private var active: [CGWindowID: Mode] = [:]
     private var indicator: NSStatusItem?
+    private let badge = Badge()
+    private var badgeFollow: Timer?
 
     private var heldKey: String?
     private var heldLastSeen = 0.0
@@ -44,9 +47,10 @@ final class Daemon {
         center.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
             if ghosttyIsFrontmost() {
-                self.refreshIndicator(focusedGhosttyWindow().flatMap { self.active[$0.id] })
+                let win = focusedGhosttyWindow()
+                self.refreshIndicator(win.flatMap { self.active[$0.id] }, win)
             } else {
-                self.refreshIndicator(nil)
+                self.refreshIndicator(nil, nil)
                 self.stopAll()            // never keep pressing keys into another app
             }
         }
@@ -118,7 +122,7 @@ final class Daemon {
         let plain = !(cmd || ctrl || alt || shift || fn)
         let mode = active[win.id]
         let shell = mode == .shell
-        refreshIndicator(mode)
+        refreshIndicator(mode, win)
 
         if key == "o" && (cmd || ctrl) && !(alt || shift) {
             if rep { return shell || (mode == nil && cmd && !win.runsClaudeCode) }
@@ -222,10 +226,11 @@ final class Daemon {
         log("mode \(String(describing: active[win.id])) -> \(String(describing: mode)) (\(win.title))")
         active[win.id] = mode
         if mode == nil { stopAll() } else { settings = Settings.load() }   // pick up edits
-        refreshIndicator(mode)
+        refreshIndicator(mode, win)
     }
 
-    private func refreshIndicator(_ mode: Mode?) {
+    private func refreshIndicator(_ mode: Mode?, _ win: GhosttyWindow?) {
+        refreshBadge(mode == .shell ? win : nil)
         if let mode {
             if indicator == nil {
                 indicator = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -237,6 +242,27 @@ final class Daemon {
         } else if let item = indicator {
             NSStatusBar.system.removeStatusItem(item)
             indicator = nil
+        }
+    }
+
+    /// The SCROLL badge, for plain-shell scroll mode only (Claude Code's
+    /// transcript view has its own header). While shown, it follows the window
+    /// and goes away if focus moves to another window or app.
+    private func refreshBadge(_ win: GhosttyWindow?) {
+        guard let win else {
+            badge.hide()
+            badgeFollow?.invalidate(); badgeFollow = nil
+            return
+        }
+        badge.show(over: win.frame)
+        guard badgeFollow == nil else { return }
+        badgeFollow = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            if ghosttyIsFrontmost(), let w = focusedGhosttyWindow(), self.active[w.id] == .shell {
+                self.badge.show(over: w.frame)
+            } else {
+                self.refreshBadge(nil)
+            }
         }
     }
 }

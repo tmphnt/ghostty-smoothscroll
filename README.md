@@ -11,7 +11,7 @@ Smooth, Vimium-style keyboard scrolling for [Ghostty](https://ghostty.org) on ma
 | `g` / `G` | top / bottom (plain shell) |
 | `q`, Esc | leave |
 
-In a plain shell, typing anything else leaves scroll mode and types normally. In a window running Claude Code, ⌘O opens Claude Code's own transcript view, and the same keys scroll it smoothly. A ⇅ shows in the menu bar while scroll mode is on.
+In a plain shell, typing anything else leaves scroll mode and types normally. In a window running Claude Code, ⌘O opens Claude Code's own transcript view, and the same keys scroll it smoothly. A ⇅ shows in the menu bar while scroll mode is on, and in a plain shell a **SCROLL** badge shows in the bottom-right corner of the window (Claude Code's transcript view has its own header).
 
 ## Install
 
