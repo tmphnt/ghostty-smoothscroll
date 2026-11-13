@@ -112,6 +112,7 @@ enum KeyNames {
 
 /// ~/.config/ghostty-smoothscroll/config, lines of `key = value`. All optional.
 struct Settings {
+    var scrollSpeed = 60.0      // lines per second while j / k is held (snaps to the display's rhythm)
     var tapLines = 3            // a quick tap of j / k scrolls at least this many lines
     var pageDuration = 0.4      // seconds a d / u page takes
     var cellHeight = 17.0       // points per terminal row (17 ≈ a 14 pt font)
@@ -119,6 +120,32 @@ struct Settings {
     var debug = false           // log decisions to stderr
 
     static let path = NSString(string: "~/.config/ghostty-smoothscroll/config").expandingTildeInPath
+
+    static let template = """
+        # ghostty-smoothscroll settings. Changes apply the next time you press ⌘O.
+
+        # Lines per second while j / k is held. It snaps to a speed that stays
+        # smooth on each display: at 120 Hz, 60 = one line every 2nd frame; at
+        # 60 Hz, 60 = one line every frame and 120 = two lines every frame.
+        # `ghostty-smoothscroll status` shows the result for your displays.
+        scroll-speed = 60
+
+        # Lines a quick tap of j / k scrolls.
+        tap-lines = 3
+
+        # Seconds a d / u page takes.
+        page-duration = 0.4
+
+        # Points per terminal row, used to size a page: about 1.2 × your font size.
+        cell-height = 17
+
+        # Rows Claude Code keeps for its prompt and footer (not scrolled by a page).
+        claude-chrome-rows = 8
+
+        # Log decisions to ~/Library/Logs/ghostty-smoothscroll.log.
+        debug = false
+
+        """
 
     static func load() -> Settings {
         var s = Settings()
@@ -128,6 +155,7 @@ struct Settings {
             let parts = line.split(separator: "=", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
             guard parts.count == 2 else { continue }
             switch parts[0] {
+            case "scroll-speed": s.scrollSpeed = Double(parts[1]) ?? s.scrollSpeed
             case "tap-lines": s.tapLines = Int(parts[1]) ?? s.tapLines
             case "page-duration": s.pageDuration = Double(parts[1]) ?? s.pageDuration
             case "cell-height": s.cellHeight = Double(parts[1]) ?? s.cellHeight

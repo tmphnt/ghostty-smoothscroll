@@ -36,9 +36,10 @@ Then reload Ghostty's config with ⌘⇧,.
 
 ## Settings
 
-Optional, in `~/.config/ghostty-smoothscroll/config`:
+`ghostty-smoothscroll config` creates `~/.config/ghostty-smoothscroll/config` with every setting documented. Changes apply the next time you press ⌘O.
 
 ```
+scroll-speed = 60        # lines per second while j / k is held
 tap-lines = 3            # lines a quick tap of j / k scrolls
 page-duration = 0.4      # seconds a d / u page takes
 cell-height = 17         # points per terminal row; about 1.2 × your font size
@@ -46,7 +47,17 @@ claude-chrome-rows = 8   # rows Claude Code keeps for its prompt and footer
 debug = false            # log decisions to ~/Library/Logs/ghostty-smoothscroll.log
 ```
 
-Changes apply after a restart: `launchctl kickstart -k gui/$(id -u)/io.github.ghostty-smoothscroll`.
+### Scroll speed and refresh rate
+
+Smooth scrolling needs a steady rhythm, so `scroll-speed` snaps to a speed that divides evenly into the display's frames:
+
+| `scroll-speed` | 60 Hz | 75 Hz | 120 Hz (ProMotion) |
+|---|---|---|---|
+| 30 | 1 line every 2nd frame (30/s) | every 2nd frame (37/s) | every 4th frame (30/s) |
+| 60 (default) | every frame (60/s) | every frame (75/s) | every 2nd frame (60/s) |
+| 120 | 2 lines every frame (120/s) | 2 per frame (150/s) | every frame (120/s) |
+
+The frame rate is measured while scrolling, since ProMotion and variable-refresh displays don't always report their real rate. `ghostty-smoothscroll status` shows what each of your displays gets, from the rates they report.
 
 ## How it works
 
@@ -58,7 +69,7 @@ Ghostty has no plugin system and no smooth keyboard scrolling, and Claude Code s
   - **plain shell:** ⌃⌥⇧⌘ + Page Down / Page Up, which `smoothscroll.conf` binds to Ghostty's `scroll_page_lines:±1`;
   - **Claude Code:** ↓ / ↑, which the transcript view scrolls a line each.
 
-One line per frame at a steady rhythm is what looks smooth in a terminal; several lines per frame looks choppy. So the hold speed equals the refresh rate: 60 lines/s on a 60 Hz display, 120 on ProMotion.
+One line per frame at a steady rhythm is what looks smooth in a terminal; several lines per frame looks choppy. The hold speed is set by `scroll-speed` (see Settings) and snaps to an even rhythm on each display.
 
 Claude Code windows are recognised by their title, which Claude Code starts with ◐, ◑ or ✳.
 
@@ -78,7 +89,7 @@ Claude Code windows are recognised by their title, which Claude Code starts with
 
 So far tested on one Mac: macOS 27.2, Ghostty 1.4.0, a 60 Hz built-in display, US keyboard layout. Reports are welcome for:
 
-- other refresh rates (75 Hz, 120 Hz ProMotion), and windows moved between displays;
+- other refresh rates (120 Hz ProMotion, 144 Hz+), and windows moved between displays;
 - other keyboard layouts (Dvorak, AZERTY, …);
 - Ghostty splits and tabs;
 - after sleep / wake and after a reboot.

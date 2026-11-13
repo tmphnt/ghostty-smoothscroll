@@ -47,6 +47,11 @@ final class Scroller {
     // Shared with the display-link thread; guarded by `lock`.
     private var target = ScrollTarget.arrows
     private var dir = 0, held = false, minLeft = 0
+    private var speed = 60.0, frameCount = 0
+    // Measured frame interval (seconds, smoothed). The reported refresh rate
+    // isn't trusted: ProMotion and variable-refresh displays may report one rate
+    // and run another.
+    private var measuredInterval = 0.0, lastFrame = 0.0
     private var paging = false, pageTotal = 0, pageSent = 0
     private var pageStart = 0.0, pageDuration = 0.4
 
@@ -58,14 +63,38 @@ final class Scroller {
     func setDisplay(_ id: CGDirectDisplayID) {
         guard id != displayID else { return }
         displayID = id
+        lock.lock(); measuredInterval = 0; lock.unlock()
         if let link, CVDisplayLinkSetCurrentCGDisplay(link, id) == kCVReturnSuccess { return }
         makeLink()
     }
 
-    /// Start scrolling one line per frame until `release()`, and at least `tapLines` lines.
-    func press(dir d: Int, tapLines: Int, target t: ScrollTarget) {
-        lock.lock(); paging = false; dir = d; held = true; minLeft = tapLines; target = t; lock.unlock()
+    /// Start scrolling at about `speed` lines per second until `release()`, and
+    /// at least `tapLines` lines.
+    func press(dir d: Int, tapLines: Int, speed: Double, target t: ScrollTarget) {
+        lock.lock()
+        let hz = currentRefresh()
+        let c = Cadence(refresh: hz, speed: speed)
+        paging = false; dir = d; held = true; minLeft = tapLines; target = t
+        self.speed = speed
+        frameCount = c.framesPerStep - 1     // the first line goes out on the next frame
+        lock.unlock()
+        log(String(format: "hold: %.0f Hz (%@), %d line(s) every %d frame(s) = %.0f lines/s",
+                   hz, measuredInterval > 0 ? "measured" : "reported", c.linesPerStep, c.framesPerStep,
+                   c.speed(refresh: hz)))
         start()
+    }
+
+    /// Frames per second: measured if we have it, else what the display reports. Call with `lock` held.
+    private func currentRefresh() -> Double {
+        if measuredInterval > 0 { return 1 / measuredInterval }
+        guard let link else { return 60 }
+        return Scroller.refreshRate(of: link)
+    }
+
+    static func refreshRate(of link: CVDisplayLink) -> Double {
+        let t = CVDisplayLinkGetNominalOutputVideoRefreshPeriod(link)
+        guard t.flags & Int32(CVTimeFlags.isIndefinite.rawValue) == 0, t.timeValue > 0 else { return 60 }
+        return Double(t.timeScale) / Double(t.timeValue)
     }
 
     func release() {
@@ -129,6 +158,11 @@ final class Scroller {
     private func frame() {
         let t = now()
         lock.lock()
+        let gap = t - lastFrame
+        lastFrame = t
+        if gap > 0.003 && gap < 0.05 {       // ignore the gap across a stop
+            measuredInterval = measuredInterval == 0 ? gap : measuredInterval * 0.9 + gap * 0.1
+        }
         var lines = 0
         if paging {
             let x = min(1, (t - pageStart) / pageDuration)
@@ -140,8 +174,13 @@ final class Scroller {
         }
         if dir != 0 {
             if held || minLeft > 0 {
-                lines += dir
-                minLeft = max(0, minLeft - 1)
+                let cadence = Cadence(refresh: currentRefresh(), speed: speed)
+                frameCount += 1
+                if frameCount >= cadence.framesPerStep {
+                    frameCount = 0
+                    lines += dir * cadence.linesPerStep
+                    minLeft = max(0, minLeft - cadence.linesPerStep)
+                }
             } else {
                 dir = 0
             }
@@ -165,4 +204,28 @@ final class Scroller {
         lock.lock(); let idle = !paging && dir == 0; lock.unlock()
         if idle, let link, CVDisplayLinkIsRunning(link) { CVDisplayLinkStop(link) }
     }
+}
+
+/// How a hold speed maps onto display frames. Smoothness needs a steady rhythm,
+/// so the speed snaps to one that divides evenly into frames: one line every N
+/// frames when slower than the refresh rate, N lines every frame when faster.
+/// E.g. 60 lines/s is one line every 2nd frame at 120 Hz, every frame at 60 Hz.
+struct Cadence {
+    let framesPerStep: Int
+    let linesPerStep: Int
+
+    init(framesPerStep: Int, linesPerStep: Int) {
+        self.framesPerStep = framesPerStep; self.linesPerStep = linesPerStep
+    }
+
+    init(refresh: Double, speed: Double) {
+        let s = max(1, speed)
+        if s >= refresh {
+            self.init(framesPerStep: 1, linesPerStep: max(1, Int((s / refresh).rounded())))
+        } else {
+            self.init(framesPerStep: max(1, Int((refresh / s).rounded())), linesPerStep: 1)
+        }
+    }
+
+    func speed(refresh: Double) -> Double { refresh * Double(linesPerStep) / Double(framesPerStep) }
 }

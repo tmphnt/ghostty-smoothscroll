@@ -186,7 +186,7 @@ final class Daemon {
         if let d = win.displayID { scroller.setDisplay(d) }
         heldKey = key; heldLastSeen = now()
         log("press \(key) (\(mode))")
-        scroller.press(dir: dir, tapLines: settings.tapLines, target: target(mode))
+        scroller.press(dir: dir, tapLines: settings.tapLines, speed: settings.scrollSpeed, target: target(mode))
         holdWatch?.invalidate()
         holdWatch = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             guard let self, self.heldKey != nil, self.now() - self.heldLastSeen > self.holdTimeout else { return }
@@ -221,7 +221,7 @@ final class Daemon {
     private func setMode(_ win: GhosttyWindow, _ mode: Mode?) {
         log("mode \(String(describing: active[win.id])) -> \(String(describing: mode)) (\(win.title))")
         active[win.id] = mode
-        if mode == nil { stopAll() }
+        if mode == nil { stopAll() } else { settings = Settings.load() }   // pick up edits
         refreshIndicator(mode)
     }
 

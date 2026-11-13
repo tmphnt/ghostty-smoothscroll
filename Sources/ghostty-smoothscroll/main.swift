@@ -3,6 +3,7 @@
 //   ghostty-smoothscroll setup      add the Ghostty keybinds and start at login
 //   ghostty-smoothscroll uninstall  undo `setup`
 //   ghostty-smoothscroll status     show what is installed and running
+//   ghostty-smoothscroll config     create the settings file (if missing) and show its path
 //   ghostty-smoothscroll run        the background process (started by `setup`)
 
 import AppKit
@@ -155,7 +156,38 @@ func status() {
     print("launch agent    \(FileManager.default.fileExists(atPath: agentPlist) ? agentPlist : "(not installed)")")
     print("running         \(running ? "yes" : "no")")
     print("log             \(logFile)")
-    print("settings        \(Settings.path) \(FileManager.default.fileExists(atPath: Settings.path) ? "" : "(defaults)")")
+    print("settings        \(Settings.path) \(FileManager.default.fileExists(atPath: Settings.path) ? "" : "(defaults; `config` creates it)")")
+    print(String(format: "scroll speed    %.0f lines/s requested; on your displays (reported refresh rates):", settings.scrollSpeed))
+    for (name, hz) in displays() {
+        let c = Cadence(refresh: hz, speed: settings.scrollSpeed)
+        let rhythm = c.framesPerStep == 1 ? "\(c.linesPerStep) line(s) every frame"
+                                          : "1 line every \(c.framesPerStep) frames"
+        print(String(format: "                  %@ (%.0f Hz): %.0f lines/s, %@", name, hz, c.speed(refresh: hz), rhythm))
+    }
+}
+
+/// Active displays: name and refresh rate.
+func displays() -> [(String, Double)] {
+    var ids = [CGDirectDisplayID](repeating: 0, count: 16), count: UInt32 = 0
+    guard CGGetActiveDisplayList(16, &ids, &count) == .success else { return [] }
+    return ids.prefix(Int(count)).map { id in
+        let name = NSScreen.screens.first {
+            ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == id
+        }?.localizedName ?? "display \(id)"
+        var link: CVDisplayLink?
+        CVDisplayLinkCreateWithCGDisplay(id, &link)
+        return (name, link.map(Scroller.refreshRate(of:)) ?? 60)
+    }
+}
+
+func config() throws {
+    if !FileManager.default.fileExists(atPath: Settings.path) {
+        try FileManager.default.createDirectory(atPath: (Settings.path as NSString).deletingLastPathComponent,
+                                                withIntermediateDirectories: true)
+        try Settings.template.write(toFile: Settings.path, atomically: true, encoding: .utf8)
+        print("created \(Settings.path)")
+    }
+    print(Settings.path)
 }
 
 func run() -> Never {
@@ -174,6 +206,7 @@ do {
     case "setup": try setup()
     case "uninstall": try uninstall()
     case "status": status()
+    case "config": try config()
     case "version", "--version": print(version)
     default:
         print("""
@@ -182,6 +215,7 @@ do {
               setup      add the Ghostty keybinds and start in the background at login
               uninstall  undo setup
               status     show what is installed and running
+              config     create the settings file (if missing) and show its path
               run        the background process itself (setup starts it for you)
 
             In Ghostty: ⌘O enters scroll mode. Hold j / k to scroll, d / u for a page,
