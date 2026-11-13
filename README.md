@@ -18,6 +18,7 @@ In a plain shell, typing anything else leaves scroll mode and types normally. In
 With Homebrew:
 
 ```sh
+brew trust --formula tmphnt/tap/ghostty-smoothscroll   # Homebrew 7+ asks you to trust formulas from personal taps
 brew install tmphnt/tap/ghostty-smoothscroll
 ghostty-smoothscroll setup
 ```
