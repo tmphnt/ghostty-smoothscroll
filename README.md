@@ -15,10 +15,17 @@ In a plain shell, typing anything else leaves scroll mode and types normally. In
 
 ## Install
 
-From source (needs the Xcode Command Line Tools):
+With Homebrew:
 
 ```sh
-git clone <this repo> && cd ghostty-smoothscroll
+brew install tmphnt/tap/ghostty-smoothscroll
+ghostty-smoothscroll setup
+```
+
+Or from source (needs the Xcode Command Line Tools):
+
+```sh
+git clone https://github.com/tmphnt/ghostty-smoothscroll && cd ghostty-smoothscroll
 swift build -c release
 install -m 755 .build/release/ghostty-smoothscroll ~/.local/bin/   # anywhere on your PATH; `install` replaces the file, a plain `cp` over a running binary gets it killed
 ghostty-smoothscroll setup
@@ -95,3 +102,7 @@ So far tested on one Mac: macOS 27.2, Ghostty 1.4.0, a 60 Hz built-in display, U
 - after sleep / wake and after a reboot.
 
 Useful for reports: set `debug = true` and attach `~/Library/Logs/ghostty-smoothscroll.log`.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

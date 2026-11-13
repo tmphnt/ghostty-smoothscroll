@@ -3,11 +3,11 @@
 #   2. Create a repo named homebrew-tap and put this file in its Formula/ folder,
 #      with OWNER, the URL and the sha256 filled in
 #      (sha256: `curl -L <url> | shasum -a 256`).
-#   3. Users install with: brew install OWNER/tap/ghostty-smoothscroll
+#   3. Users install with: brew install tmphnt/tap/ghostty-smoothscroll
 class GhosttySmoothscroll < Formula
   desc "Smooth, Vimium-style keyboard scrolling for Ghostty on macOS"
-  homepage "https://github.com/OWNER/ghostty-smoothscroll"
-  url "https://github.com/OWNER/ghostty-smoothscroll/archive/refs/tags/v0.1.0.tar.gz"
+  homepage "https://github.com/tmphnt/ghostty-smoothscroll"
+  url "https://github.com/tmphnt/ghostty-smoothscroll/archive/refs/tags/v0.1.0.tar.gz"
   sha256 "FILL_IN"
   license "MIT"
 
