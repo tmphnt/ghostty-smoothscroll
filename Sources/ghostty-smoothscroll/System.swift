@@ -31,6 +31,17 @@ struct GhosttyWindow {
     }
 }
 
+/// Where the permission lives in System Settings. macOS 27 renamed the
+/// Accessibility pane to Device Control and Data Access.
+let permissionPane = ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 27
+    ? "System Settings → Privacy & Security → Device Control and Data Access"
+    : "System Settings → Privacy & Security → Accessibility"
+
+/// Opens that pane (the URL works under either name).
+func openPermissionPane() {
+    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+}
+
 func ghosttyIsFrontmost() -> Bool {
     NSWorkspace.shared.frontmostApplication?.bundleIdentifier == ghosttyBundleID
 }

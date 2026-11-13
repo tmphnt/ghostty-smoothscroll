@@ -65,8 +65,8 @@ final class Daemon {
         let prompt = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         if AXIsProcessTrustedWithOptions(prompt) { go(); return }
         FileHandle.standardError.write("""
-            ghostty-smoothscroll needs Accessibility permission: System Settings → \
-            Privacy & Security → Accessibility. Waiting for it…\n
+            ghostty-smoothscroll needs permission to read and send keys: \(permissionPane). \
+            Waiting for it…\n
             """.data(using: .utf8)!)
         Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { timer in
             if AXIsProcessTrusted() { timer.invalidate(); go() }

@@ -35,11 +35,11 @@ ghostty-smoothscroll setup
 
 1. Writes `smoothscroll.conf` next to your Ghostty config, with the keybinds it needs, and adds `config-file = ?smoothscroll.conf` to your config.
 2. Installs a launch agent, so it runs in the background and starts at login.
-3. Starts it. macOS then asks for **Accessibility** permission (System Settings → Privacy & Security → Accessibility). Scrolling starts as soon as you allow it.
+3. Starts it. macOS then asks you to allow it to read and send keys: in **Device Control and Data Access** on macOS 27 and later, **Accessibility** on earlier versions (System Settings → Privacy & Security). `ghostty-smoothscroll permissions` opens that pane. Scrolling starts as soon as you allow it.
 
 Then reload Ghostty's config with ⌘⇧,.
 
-`ghostty-smoothscroll status` shows what's installed; `ghostty-smoothscroll uninstall` undoes all of it.
+`ghostty-smoothscroll status` shows what's installed, `ghostty-smoothscroll permissions` opens the permission pane, and `ghostty-smoothscroll uninstall` undoes all of it.
 
 ## Settings
 
@@ -88,7 +88,7 @@ Claude Code windows are recognised by their title, which Claude Code starts with
 
 ## Known limitations
 
-- **Accessibility permission and rebuilds.** The binary is ad-hoc signed, so macOS ties the permission to that exact build. After an upgrade or rebuild you may need to allow it again (remove the old entry, then add the new one). A Developer ID signature would fix this.
+- **The permission and rebuilds.** The binary is ad-hoc signed, so macOS ties the permission to that exact build. After an upgrade or rebuild you may need to allow it again: `ghostty-smoothscroll permissions` opens the pane; remove the old entry with −, then add the new one with +. A Developer ID signature would fix this.
 - **Claude Code mode is tracked by counting ⌘O presses.** If it gets out of step, `j` / `k` jump half a page; press ⌘O twice to resync.
 - **Page size is estimated** from the window height and `cell-height`.
 

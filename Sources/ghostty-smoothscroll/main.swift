@@ -4,11 +4,12 @@
 //   ghostty-smoothscroll uninstall  undo `setup`
 //   ghostty-smoothscroll status     show what is installed and running
 //   ghostty-smoothscroll config     create the settings file (if missing) and show its path
+//   ghostty-smoothscroll permissions  open the System Settings pane for its permission
 //   ghostty-smoothscroll run        the background process (started by `setup`)
 
 import AppKit
 
-let version = "0.1.0"
+let version = "0.1.1"
 let agentLabel = "io.github.ghostty-smoothscroll"
 var settings = Settings.load()
 
@@ -122,9 +123,10 @@ func setup() throws {
 
         Next:
           1. Reload Ghostty's config: ⌘⇧, in Ghostty.
-          2. Allow Accessibility when macOS asks (System Settings → Privacy & Security
-             → Accessibility → ghostty-smoothscroll). Scrolling starts by itself once
-             it's allowed.
+          2. Allow ghostty-smoothscroll when macOS asks, or turn it on yourself in
+             \(permissionPane)
+             (`ghostty-smoothscroll permissions` opens it). Scrolling starts by itself
+             once it's allowed.
         Then press ⌘O in Ghostty and hold j / k.
         """)
 }
@@ -143,7 +145,8 @@ func uninstall() throws {
         try kept.joined(separator: "\n").write(toFile: config, atomically: true, encoding: .utf8)
     }
     print("removed the keybinds from \(config). Reload Ghostty's config with ⌘⇧,.")
-    print("You can also remove ghostty-smoothscroll from System Settings → Privacy & Security → Accessibility.")
+    print("You can also remove ghostty-smoothscroll from \(permissionPane)")
+    print("(`ghostty-smoothscroll permissions` opens it; select it and click −).")
 }
 
 func status() {
@@ -237,17 +240,19 @@ do {
     case "uninstall": try uninstall()
     case "status": status()
     case "config": try config()
+    case "permissions": openPermissionPane(); print("opened \(permissionPane)")
     case "_key": testKey(Array(CommandLine.arguments.dropFirst(2)))
     case "version", "--version": print(version)
     default:
         print("""
             ghostty-smoothscroll \(version): smooth, Vimium-style scrolling for Ghostty.
 
-              setup      add the Ghostty keybinds and start in the background at login
-              uninstall  undo setup
-              status     show what is installed and running
-              config     create the settings file (if missing) and show its path
-              run        the background process itself (setup starts it for you)
+              setup        add the Ghostty keybinds and start in the background at login
+              uninstall    undo setup
+              status       show what is installed and running
+              config       create the settings file (if missing) and show its path
+              permissions  open the System Settings pane for its permission
+              run          the background process itself (setup starts it for you)
 
             In Ghostty: ⌘O enters scroll mode. Hold j / k to scroll, d / u for a page,
             g / G for top / bottom, q or Esc to leave. In a Claude Code window ⌘O opens

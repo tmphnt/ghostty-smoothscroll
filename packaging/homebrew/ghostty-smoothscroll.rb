@@ -19,9 +19,11 @@ class GhosttySmoothscroll < Formula
     <<~EOS
       To finish setting up, run:
         ghostty-smoothscroll setup
-      then reload Ghostty's config (⌘⇧,) and allow Accessibility when macOS asks.
+      then reload Ghostty's config (⌘⇧,) and allow ghostty-smoothscroll when macOS
+      asks (Device Control and Data Access on macOS 27+, Accessibility before).
 
-      After `brew upgrade`, macOS may ask for Accessibility permission again.
+      After `brew upgrade`, macOS may ask for the permission again:
+      `ghostty-smoothscroll permissions` opens the pane.
     EOS
   end
 
