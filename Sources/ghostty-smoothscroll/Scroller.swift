@@ -25,12 +25,15 @@ enum KeyCode {
 }
 
 private let hyper: CGEventFlags = [.maskCommand, .maskControl, .maskAlternate, .maskShift]
-private let eventSource = CGEventSource(stateID: .hidSystemState)
+// A private source, and explicit modifiers on every event: with the shared
+// .hidSystemState source the ⌃⌥⇧⌘ of the scrollback keys "stuck", and the plain
+// arrows for Claude Code went out as ⌃⌥⇧⌘ + arrow.
+private let eventSource = CGEventSource(stateID: .privateState)
 
 func postKey(_ code: CGKeyCode, hyper useHyper: Bool) {
     for down in [true, false] {
         guard let ev = CGEvent(keyboardEventSource: eventSource, virtualKey: code, keyDown: down) else { continue }
-        if useHyper { ev.flags = hyper }
+        ev.flags = useHyper ? hyper : []
         ev.setIntegerValueField(.eventSourceUserData, value: eventMark)
         ev.post(tap: .cghidEventTap)
     }
