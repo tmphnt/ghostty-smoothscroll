@@ -190,6 +190,36 @@ func config() throws {
     print(Settings.path)
 }
 
+/// For testing by hand or by script: `_key <j|k|d|u|g|o|q> <hold seconds> [cmd]`
+/// presses a key in Ghostty as if typed (ghostty-smoothscroll's own tap sees it).
+/// Refuses unless Ghostty is the frontmost app.
+func testKey(_ args: [String]) {
+    let codes: [String: CGKeyCode] = ["j": 38, "k": 40, "d": 2, "u": 32, "g": 5, "o": 31, "q": 12]
+    guard args.count >= 2, let code = codes[args[0]], let hold = Double(args[1]) else {
+        print("usage: ghostty-smoothscroll _key <j|k|d|u|g|o|q> <hold seconds> [cmd]"); exit(2)
+    }
+    guard ghosttyIsFrontmost() else { print("Ghostty isn't the frontmost app; not pressing anything"); exit(1) }
+    let src = CGEventSource(stateID: .privateState)
+    let flags: CGEventFlags = args.count > 2 && args[2] == "cmd" ? .maskCommand : []
+    func post(_ down: Bool) {
+        let ev = CGEvent(keyboardEventSource: src, virtualKey: code, keyDown: down)
+        ev?.flags = flags
+        ev?.post(tap: .cghidEventTap)
+    }
+    post(true)
+    // Autorepeat, as a held key would: the daemon releases a hold that goes quiet.
+    let end = Date().addingTimeInterval(hold)
+    Thread.sleep(forTimeInterval: min(hold, NSEvent.keyRepeatDelay))
+    while Date() < end {
+        let ev = CGEvent(keyboardEventSource: src, virtualKey: code, keyDown: true)
+        ev?.flags = flags
+        ev?.setIntegerValueField(.keyboardEventAutorepeat, value: 1)
+        ev?.post(tap: .cghidEventTap)
+        Thread.sleep(forTimeInterval: min(0.033, end.timeIntervalSinceNow))
+    }
+    post(false)
+}
+
 func run() -> Never {
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)    // no Dock icon; the ⇅ menu bar item only
@@ -207,6 +237,7 @@ do {
     case "uninstall": try uninstall()
     case "status": status()
     case "config": try config()
+    case "_key": testKey(Array(CommandLine.arguments.dropFirst(2)))
     case "version", "--version": print(version)
     default:
         print("""
