@@ -351,11 +351,41 @@ func testKey(_ args: [String]) {
     post(false)
 }
 
+/// Notices when this binary is replaced or deleted. A running program keeps
+/// going after its file is gone, so without this `brew upgrade` would leave the
+/// old version running and `brew uninstall` would leave it running for good.
+///   - upgraded (the launch agent's path now holds another binary): exit, and
+///     launchd starts the new one.
+///   - uninstalled (the launch agent's path is gone too): remove the launch
+///     agent so nothing tries to start a missing program at login, and stop.
+func watchOwnBinary() {
+    let me = ((Bundle.main.executablePath ?? CommandLine.arguments[0]) as NSString).resolvingSymlinksInPath
+    let program = (NSDictionary(contentsOfFile: agentPlist)?["ProgramArguments"] as? [String])?.first
+    var missingChecks = 0
+    Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+        let fm = FileManager.default
+        guard !fm.fileExists(atPath: me) else { missingChecks = 0; return }
+        missingChecks += 1
+        guard missingChecks >= 2 else { return }      // ride out the moment mid-upgrade
+        if let program, fm.fileExists(atPath: program) {
+            FileHandle.standardError.write("binary replaced (upgrade?): restarting\n".data(using: .utf8)!)
+            exit(0)
+        }
+        FileHandle.standardError.write("binary deleted (uninstalled?): removing the launch agent and stopping\n".data(using: .utf8)!)
+        if program != nil, program == (NSDictionary(contentsOfFile: agentPlist)?["ProgramArguments"] as? [String])?.first {
+            try? fm.removeItem(atPath: agentPlist)
+        }
+        launchctl("bootout", "\(guiDomain)/\(agentLabel)")   // stops this process
+        exit(0)
+    }
+}
+
 func run() -> Never {
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)    // no Dock icon; the ⇅ menu bar item only
     let daemon = Daemon()
     daemon.start()
+    watchOwnBinary()
     withExtendedLifetime(daemon) { app.run() }
     exit(0)
 }
