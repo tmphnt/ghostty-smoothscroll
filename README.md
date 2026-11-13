@@ -53,7 +53,7 @@ Smooth scrolling needs a steady rhythm, so `scroll-speed` snaps to a speed that 
 
 | `scroll-speed` | 60 Hz | 75 Hz | 120 Hz (ProMotion) |
 |---|---|---|---|
-| 30 | 1 line every 2nd frame (30/s) | every 2nd frame (37/s) | every 4th frame (30/s) |
+| 30 | 1 line every 2nd frame (30/s) | every 3rd frame (25/s) | every 4th frame (30/s) |
 | 60 (default) | every frame (60/s) | every frame (75/s) | every 2nd frame (60/s) |
 | 120 | 2 lines every frame (120/s) | 2 per frame (150/s) | every frame (120/s) |
 
