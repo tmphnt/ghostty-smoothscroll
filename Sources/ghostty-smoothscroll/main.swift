@@ -9,7 +9,7 @@
 
 import AppKit
 
-let version = "0.1.1"
+let version = "0.1.2"
 let agentLabel = "io.github.ghostty-smoothscroll"
 var settings = Settings.load()
 
@@ -82,7 +82,7 @@ func launchctl(_ args: String...) -> Int32 {
 
 let guiDomain = "gui/\(getuid())"
 
-func writeAgent() throws {
+func agentPlistData() throws -> Data {
     let plist: [String: Any] = [
         "Label": agentLabel,
         "ProgramArguments": [stableExecutablePath(), "run"],
@@ -91,62 +91,190 @@ func writeAgent() throws {
         "ProcessType": "Interactive",
         "StandardErrorPath": logFile,
     ]
-    let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
-    try FileManager.default.createDirectory(atPath: (agentPlist as NSString).deletingLastPathComponent,
-                                            withIntermediateDirectories: true)
-    try data.write(to: URL(fileURLWithPath: agentPlist))
+    return try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+}
+
+func agentRunning() -> Bool { launchctl("print", "\(guiDomain)/\(agentLabel)") == 0 }
+
+// MARK: Asking
+
+/// Set by --yes: accept every change without asking.
+var assumeYes = false
+
+/// Explains one change and asks for a yes or no. Returns true for yes.
+func confirm(_ step: String, _ title: String, _ explanation: [String]) -> Bool {
+    print("\n\(step) \(title)")
+    for line in explanation { print("   \(line)") }
+    if assumeYes { print("   → yes (--yes)"); return true }
+    while true {
+        print("   Make this change? [y/n] ", terminator: "")
+        fflush(stdout)
+        guard let answer = readLine()?.trimmingCharacters(in: .whitespaces).lowercased() else {
+            print(""); return false                       // input closed: treat as no
+        }
+        if ["y", "yes"].contains(answer) { return true }
+        if ["n", "no"].contains(answer) { return false }
+    }
+}
+
+/// setup and uninstall ask before each change, so they need someone to answer.
+func requireAnswers(_ command: String) {
+    if assumeYes || isatty(STDIN_FILENO) != 0 { return }
+    FileHandle.standardError.write("""
+        ghostty-smoothscroll \(command) asks before each change, so run it in a terminal,
+        or add --yes to accept every change.\n
+        """.data(using: .utf8)!)
+    exit(1)
 }
 
 // MARK: Commands
 
 func setup() throws {
+    requireAnswers("setup")
     let config = ghosttyConfig()
     let conf = keybindFile(for: config)
-    try FileManager.default.createDirectory(atPath: (config as NSString).deletingLastPathComponent,
-                                            withIntermediateDirectories: true)
-    try keybinds.write(toFile: conf, atomically: true, encoding: .utf8)
-    print("wrote \(conf)")
-    if !configIncludes(config) {
+    let fm = FileManager.default
+    print("Setting up ghostty-smoothscroll. It asks before each change; nothing is changed without a yes.")
+
+    // 1. The keybinds file
+    var keybindsReady = (try? String(contentsOfFile: conf, encoding: .utf8)) == keybinds
+    if keybindsReady {
+        print("\n1. Keybinds file for Ghostty: already in place (\(conf)).")
+    } else if confirm("1.", fm.fileExists(atPath: conf) ? "Update the keybinds file for Ghostty" : "Add a keybinds file for Ghostty", [
+        "\(fm.fileExists(atPath: conf) ? "Rewrites" : "Creates") \(conf), with Ghostty shortcuts:",
+        "• ⌘O sends Ctrl+O, so ⌘O opens Claude Code's transcript view.",
+        "• ⌃⌥⇧⌘ + Page Down / Page Up / Home / End scroll Ghostty's scrollback by",
+        "  one line or to the top / bottom. ghostty-smoothscroll presses these for you;",
+        "  you'd never type them yourself.",
+        "This file does nothing until step 2 tells Ghostty to load it.",
+    ]) {
+        try fm.createDirectory(atPath: (config as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+        try keybinds.write(toFile: conf, atomically: true, encoding: .utf8)
+        print("   Done.")
+        keybindsReady = true
+    } else {
+        print("   Skipped. Without these shortcuts, scrolling in a plain shell won't work.")
+    }
+
+    // 2. The include line
+    var includeReady = configIncludes(config)
+    if includeReady {
+        print("\n2. Ghostty config loads the keybinds file: already in place.")
+    } else if confirm("2.", "Load the keybinds file from your Ghostty config", [
+        "Adds two lines at the end of \(config):",
+        "    # Smooth scrolling (ghostty-smoothscroll)",
+        "    \(includeLine)",
+        "Nothing else in your config changes. The ? makes Ghostty ignore the line",
+        "if the keybinds file is ever missing.",
+    ]) {
         var text = (try? String(contentsOfFile: config, encoding: .utf8)) ?? ""
         if !text.isEmpty && !text.hasSuffix("\n") { text += "\n" }
         text += "\n# Smooth scrolling (ghostty-smoothscroll)\n\(includeLine)\n"
         try text.write(toFile: config, atomically: true, encoding: .utf8)
-        print("added `\(includeLine)` to \(config)")
+        print("   Done.")
+        includeReady = true
+    } else {
+        print("   Skipped. Ghostty won't know the shortcuts from step 1.")
     }
 
-    try writeAgent()
-    launchctl("bootout", "\(guiDomain)/\(agentLabel)")
-    let status = launchctl("bootstrap", guiDomain, agentPlist)
-    print(status == 0 ? "started the background process (it also starts at login)"
-                      : "could not start the launch agent (launchctl exit \(status))")
-    print("""
+    // 3. The launch agent
+    let plist = try agentPlistData()
+    let existing = try? Data(contentsOf: URL(fileURLWithPath: agentPlist))
+    var agentReady = existing == plist && agentRunning()
+    let agentExplanation = existing == nil ? [
+        "Adds a launch agent: \(agentPlist).",
+        "macOS then starts ghostty-smoothscroll now and at every login, and restarts it",
+        "if it stops. It only acts on keys while Ghostty is the frontmost app.",
+    ] : existing == plist ? [
+        "The launch agent is installed but not running. This starts it again.",
+    ] : [
+        "A launch agent is already installed, but it starts a different copy of",
+        "ghostty-smoothscroll. This points it at \(stableExecutablePath())",
+        "and restarts it.",
+    ]
+    let agentTitle = existing == nil ? "Run in the background and start at login"
+        : existing == plist ? "Start the background process" : "Update the background launch agent"
+    if agentReady {
+        print("\n3. Run in the background and start at login: already in place.")
+    } else if confirm("3.", agentTitle, agentExplanation) {
+        try fm.createDirectory(atPath: (agentPlist as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+        try plist.write(to: URL(fileURLWithPath: agentPlist))
+        launchctl("bootout", "\(guiDomain)/\(agentLabel)")
+        let status = launchctl("bootstrap", guiDomain, agentPlist)
+        print(status == 0 ? "   Done: it's running." : "   Couldn't start it (launchctl exit \(status)).")
+        agentReady = status == 0
+    } else {
+        print("   Skipped. Start it yourself when you want it: ghostty-smoothscroll run")
+    }
 
-        Next:
-          1. Reload Ghostty's config: ⌘⇧, in Ghostty.
-          2. Allow ghostty-smoothscroll when macOS asks, or turn it on yourself in
-             \(permissionPane)
-             (`ghostty-smoothscroll permissions` opens it). Scrolling starts by itself
-             once it's allowed.
-        Then press ⌘O in Ghostty and hold j / k.
-        """)
+    // Next steps
+    var next: [String] = []
+    if keybindsReady && includeReady { next.append("Reload Ghostty's config: ⌘⇧, in Ghostty.") }
+    if agentReady {
+        next.append("""
+            Allow ghostty-smoothscroll when macOS asks, or turn it on yourself in
+                 \(permissionPane)
+                 (`ghostty-smoothscroll permissions` opens it). It needs this to see and press
+                 keys. Scrolling starts by itself once it's allowed.
+            """)
+    }
+    if next.isEmpty { return }
+    print("\nNext:")
+    for (i, step) in next.enumerated() { print("  \(i + 1). \(step)") }
+    print("Then press ⌘O in Ghostty and hold j / k.")
 }
 
 func uninstall() throws {
-    launchctl("bootout", "\(guiDomain)/\(agentLabel)")
-    try? FileManager.default.removeItem(atPath: agentPlist)
-    print("stopped and removed the launch agent")
+    requireAnswers("uninstall")
     let config = ghosttyConfig()
-    try? FileManager.default.removeItem(atPath: keybindFile(for: config))
-    if configIncludes(config), let text = try? String(contentsOfFile: config, encoding: .utf8) {
-        let kept = text.components(separatedBy: "\n").filter {
-            let t = $0.trimmingCharacters(in: .whitespaces)
-            return t != includeLine && t != "# Smooth scrolling (ghostty-smoothscroll)"
-        }
-        try kept.joined(separator: "\n").write(toFile: config, atomically: true, encoding: .utf8)
+    let conf = keybindFile(for: config)
+    let fm = FileManager.default
+    let hasAgent = fm.fileExists(atPath: agentPlist) || agentRunning()
+    let hasConf = fm.fileExists(atPath: conf)
+    let hasInclude = configIncludes(config)
+    if !hasAgent && !hasConf && !hasInclude {
+        print("Nothing to remove: ghostty-smoothscroll isn't set up.")
+    } else {
+        print("Removing ghostty-smoothscroll's setup. It asks before each change.")
     }
-    print("removed the keybinds from \(config). Reload Ghostty's config with ⌘⇧,.")
-    print("You can also remove ghostty-smoothscroll from \(permissionPane)")
-    print("(`ghostty-smoothscroll permissions` opens it; select it and click −).")
+
+    if hasAgent && confirm("•", "Stop it and remove the launch agent", [
+        "Stops ghostty-smoothscroll and deletes \(agentPlist),",
+        "so it no longer starts at login.",
+    ]) {
+        launchctl("bootout", "\(guiDomain)/\(agentLabel)")
+        try? fm.removeItem(atPath: agentPlist)
+        print("   Done.")
+    }
+    if hasInclude && confirm("•", "Remove the keybinds line from your Ghostty config", [
+        "Deletes these lines from \(config):",
+        "    # Smooth scrolling (ghostty-smoothscroll)",
+        "    \(includeLine)",
+        "Nothing else in your config changes.",
+    ]), let text = try? String(contentsOfFile: config, encoding: .utf8) {
+        // Remove exactly what setup added (with its blank line), else just the two lines.
+        let block = "\n\n# Smooth scrolling (ghostty-smoothscroll)\n\(includeLine)\n"
+        let cleaned = text.contains(block)
+            ? text.replacingOccurrences(of: block, with: "\n")
+            : text.components(separatedBy: "\n").filter {
+                let t = $0.trimmingCharacters(in: .whitespaces)
+                return t != includeLine && t != "# Smooth scrolling (ghostty-smoothscroll)"
+            }.joined(separator: "\n")
+        try cleaned.write(toFile: config, atomically: true, encoding: .utf8)
+        print("   Done. Reload Ghostty's config with ⌘⇧,.")
+    }
+    if hasConf && confirm("•", "Delete the keybinds file", [
+        "Deletes \(conf), which holds the ⌘O and scrolling shortcuts.",
+    ]) {
+        try? fm.removeItem(atPath: conf)
+        print("   Done.")
+    }
+    print("""
+
+        To remove its permission too: \(permissionPane)
+        (`ghostty-smoothscroll permissions` opens it; select ghostty-smoothscroll and click −).
+        """)
+    if fm.fileExists(atPath: Settings.path) { print("Your settings file stays: \(Settings.path)") }
 }
 
 func status() {
@@ -232,7 +360,9 @@ func run() -> Never {
     exit(0)
 }
 
-let command = CommandLine.arguments.dropFirst().first ?? "help"
+let arguments = CommandLine.arguments.dropFirst()
+assumeYes = arguments.contains("--yes") || arguments.contains("-y")
+let command = arguments.first { !$0.hasPrefix("-") } ?? "help"
 do {
     switch command {
     case "run": run()
@@ -248,7 +378,8 @@ do {
             ghostty-smoothscroll \(version): smooth, Vimium-style scrolling for Ghostty.
 
               setup        add the Ghostty keybinds and start in the background at login
-              uninstall    undo setup
+                           (asks before each change; --yes accepts them all)
+              uninstall    undo setup (asks the same way)
               status       show what is installed and running
               config       create the settings file (if missing) and show its path
               permissions  open the System Settings pane for its permission

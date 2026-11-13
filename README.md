@@ -32,15 +32,15 @@ install -m 755 .build/release/ghostty-smoothscroll ~/.local/bin/   # anywhere on
 ghostty-smoothscroll setup
 ```
 
-`setup` does three things:
+`setup` explains each change and asks before making it (`--yes` accepts them all, for scripts). There are three:
 
-1. Writes `smoothscroll.conf` next to your Ghostty config, with the keybinds it needs, and adds `config-file = ?smoothscroll.conf` to your config.
-2. Installs a launch agent, so it runs in the background and starts at login.
-3. Starts it. macOS then asks you to allow it to read and send keys: in **Device Control and Data Access** on macOS 27 and later, **Accessibility** on earlier versions (System Settings → Privacy & Security). `ghostty-smoothscroll permissions` opens that pane. Scrolling starts as soon as you allow it.
+1. Writes `smoothscroll.conf` next to your Ghostty config, with the keybinds it needs.
+2. Adds `config-file = ?smoothscroll.conf` (and a comment line) to the end of your Ghostty config. Nothing else in it changes.
+3. Installs a launch agent, so it runs in the background and starts at login, and starts it. macOS then asks you to allow it to read and send keys: in **Device Control and Data Access** on macOS 27 and later, **Accessibility** on earlier versions (System Settings → Privacy & Security). `ghostty-smoothscroll permissions` opens that pane. Scrolling starts as soon as you allow it.
 
 Then reload Ghostty's config with ⌘⇧,.
 
-`ghostty-smoothscroll status` shows what's installed, `ghostty-smoothscroll permissions` opens the permission pane, and `ghostty-smoothscroll uninstall` undoes all of it.
+`ghostty-smoothscroll status` shows what's installed, `ghostty-smoothscroll permissions` opens the permission pane, and `ghostty-smoothscroll uninstall` undoes all of it, asking the same way.
 
 ## Settings
 
