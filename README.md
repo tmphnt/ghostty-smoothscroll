@@ -20,7 +20,7 @@ From source (needs the Xcode Command Line Tools):
 ```sh
 git clone <this repo> && cd ghostty-smoothscroll
 swift build -c release
-cp .build/release/ghostty-smoothscroll ~/.local/bin/   # or anywhere on your PATH
+install -m 755 .build/release/ghostty-smoothscroll ~/.local/bin/   # anywhere on your PATH; `install` replaces the file, a plain `cp` over a running binary gets it killed
 ghostty-smoothscroll setup
 ```
 
