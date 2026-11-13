@@ -1,9 +1,6 @@
-# Template for a Homebrew tap. To publish:
-#   1. Push this repo to GitHub and tag a release (v0.1.0).
-#   2. Create a repo named homebrew-tap and put this file in its Formula/ folder,
-#      with OWNER, the URL and the sha256 filled in
-#      (sha256: `curl -L <url> | shasum -a 256`).
-#   3. Users install with: brew install tmphnt/tap/ghostty-smoothscroll
+# The published copy lives in https://github.com/tmphnt/homebrew-tap (Formula/).
+# To release a new version: tag it here (vX.Y.Z), then update url and sha256
+# there (sha256: `curl -L <tarball url> | shasum -a 256`).
 class GhosttySmoothscroll < Formula
   desc "Smooth, Vimium-style keyboard scrolling for Ghostty on macOS"
   homepage "https://github.com/tmphnt/ghostty-smoothscroll"
