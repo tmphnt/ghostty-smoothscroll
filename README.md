@@ -13,6 +13,12 @@ Smooth, Vimium-style keyboard scrolling for [Ghostty](https://ghostty.org) on ma
 
 In a plain shell, typing anything else leaves scroll mode and types normally. In a window running Claude Code, ⌘O opens Claude Code's own transcript view, and the same keys scroll it smoothly. A ⇅ shows in the menu bar while scroll mode is on, and in a plain shell a **SCROLL** badge shows in the bottom-right corner of the window (Claude Code's transcript view has its own header).
 
+![Smooth scrolling in a plain Ghostty shell: ⌘O turns on scroll mode, with the SCROLL badge](docs/terminal.gif)
+
+In Claude Code, ⌘O opens its transcript view, and the same keys scroll it:
+
+![Smooth scrolling in Claude Code's transcript view](docs/claude-code.gif)
+
 ## Install
 
 With Homebrew:
@@ -103,6 +109,19 @@ So far tested on one Mac: macOS 27.2, Ghostty 1.4.0, a 60 Hz built-in display, U
 - after sleep / wake and after a reboot.
 
 Useful for reports: set `debug = true` and attach `~/Library/Logs/ghostty-smoothscroll.log`.
+
+## Demo GIFs
+
+`docs/*.gif` come from a screen recording (60 fps, 1432×1084), cut and shrunk with [ffmpeg](https://ffmpeg.org) (`brew install ffmpeg`). Each one is a clip converted with a generated colour palette, which keeps the text sharp at a small size:
+
+```sh
+# ffmpeg -ss <start seconds> -t <length> -i recording.mp4 -vf "<filter>" out.gif
+ffmpeg -ss 18.5 -t 9.3 -i recording.mp4 \
+  -vf "fps=30,scale=640:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=48:stats_mode=diff[p];[b][p]paletteuse=dither=none:diff_mode=rectangle" \
+  docs/terminal.gif
+```
+
+GIFs top out below the real frame rate, so scrolling looks a little less smooth here than it does live.
 
 ## License
 
